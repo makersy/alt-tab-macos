@@ -79,9 +79,21 @@ class SystemPermissions {
                 App.continueAppLaunchAfterPermissionsAreGranted()
             }
         } else if !axGranted {
-            // Prompt system dialog on main thread (only works on main thread)
-            DispatchQueue.main.async {
-                _ = AXIsProcessTrustedWithOptions([kAXTrustedCheckOptionPrompt.takeRetainedValue(): true] as CFDictionary)
+            // macOS 13+ can return stale not-granted from the trust API even when the
+            // permission is enabled in System Settings. Wait for a few timer ticks
+            // (each ~5s) before showing the system dialog so the improved detect()
+            // has a chance to self-correct via its real-AX-call fallback.
+            AccessibilityPermission.consecutiveNotGrantedDetectionCount += 1
+            let threshold = 3
+            Logger.warn {
+                "Accessibility not granted (attempt \(AccessibilityPermission.consecutiveNotGrantedDetectionCount)/\(threshold))"
+            }
+            if AccessibilityPermission.consecutiveNotGrantedDetectionCount >= threshold {
+                // Prompt system dialog on main thread (only works on main thread)
+                DispatchQueue.main.async {
+                    _ = AXIsProcessTrustedWithOptions([kAXTrustedCheckOptionPrompt.takeRetainedValue(): true] as CFDictionary)
+                }
+                AccessibilityPermission.markSystemDialogShown()
             }
         }
     }
@@ -118,6 +130,13 @@ class SystemPermissions {
 
 class AccessibilityPermission {
     static var status = PermissionStatus.notGranted
+    /// macOS 13+ has a known bug where `AXIsProcessTrustedWithOptions` can return stale
+    /// values. We count consecutive detections where the API claims .notGranted while we
+    /// haven't yet prompted the user. Only after this threshold do we actually show the
+    /// system dialog — which gives the API time to self-correct.
+    private static var consecutiveNotGrantedDetectionCount = 0
+    /// Reset by `checkPermissionsPreStartup` when it shows the system dialog.
+    static func markSystemDialogShown() { consecutiveNotGrantedDetectionCount = 0 }
 
     @discardableResult
     static func update() -> PermissionStatus {
@@ -126,7 +145,35 @@ class AccessibilityPermission {
     }
 
     private static func detect() -> PermissionStatus {
-        return AXIsProcessTrustedWithOptions([kAXTrustedCheckOptionPrompt.takeRetainedValue(): false] as CFDictionary) ? .granted : .notGranted
+        // Layer 1: the official API (fast, but can lie on macOS 13+)
+        if AXIsProcessTrustedWithOptions([kAXTrustedCheckOptionPrompt.takeRetainedValue(): false] as CFDictionary) {
+            return .granted
+        }
+        // Layer 2: try a real AX call. If we can read an attribute from the system-wide
+        // accessibility object, the permission is genuinely granted regardless of what
+        // the trust API says.
+        if probeRealAccessibilityAccess() {
+            return .granted
+        }
+        // Layer 3: legacy AXIsProcessTrusted (deprecated but more reliable on 13+)
+        if AXIsProcessTrusted() {
+            return .granted
+        }
+        return .notGranted
+    }
+
+    /// Attempt a trivial accessibility operation. Success = permission is truly granted.
+    private static func probeRealAccessibilityAccess() -> Bool {
+        let systemWide = AXUIElementCreateSystemWide()
+        var focusedApp: CFTypeRef?
+        let err = AXUIElementCopyAttributeValue(systemWide, kAXFocusedApplicationAttribute as CFString, &focusedApp)
+        if err == .success, focusedApp != nil {
+            return true
+        }
+        // AXError.apiDisabled (-25204) or AXError.notImplemented (-25206) — definitely no access
+        // any other error (including err == .cannotComplete) — could be transient,
+        // treat as no access but don't cache
+        return false
     }
 }
 
