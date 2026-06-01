@@ -55,12 +55,13 @@ jobs:
       - name: Ad-hoc sign the app
         run: |
           APP_PATH="DerivedData/Build/Products/Release/${APP_NAME}.app"
-          # Strip existing signatures from nested frameworks so --deep can
-          # re-sign them with the unified designated requirement.
-          find "$APP_PATH" -name '*.framework' -o -name '*.dylib' | while read -r target; do
-            codesign --remove-signature "$target" 2>/dev/null || true
+          # Sign nested frameworks/dylibs without custom requirements first
+          find "$APP_PATH/Contents/Frameworks" -name '*.framework' -o -name '*.dylib' 2>/dev/null | while read -r target; do
+            codesign --force --sign - --options runtime "$target" 2>/dev/null || true
           done
-          codesign --force --deep --sign - \
+          # Sign the main .app with bundle-ID-only designated requirement
+          # so TCC identifies every build as the same app.
+          codesign --force --sign - \
             --options runtime \
             --entitlements alt_tab_macos.entitlements \
             --requirements "=designated => identifier \"${APP_BUNDLE_ID}\"" \
