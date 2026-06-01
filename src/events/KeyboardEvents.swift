@@ -118,23 +118,27 @@ class KeyboardEvents {
 
     private static func addCgEventTap() {
         let eventMask = [CGEventType.flagsChanged, CGEventType.keyDown].reduce(CGEventMask(0), { $0 | (1 << $1.rawValue) })
-        // CGEvent.tapCreate returns null if ensureAccessibilityCheckboxIsChecked() didn't pass.
-        // SecureInput does not block `.flagsChanged` events on either cgSession or cghid event taps;
-        // and `.keyDown` events are filtered out at the system level for both. Issue #5585: we use
-        // `.cghidEventTap` (earliest tap point) + `.defaultTap` (can absorb) so we can swallow Esc
-        // ahead of macOS 26 Game Overlay, which hooks downstream of cgSession.
-        eventTap = CGEvent.tapCreate(
-            tap: .cghidEventTap,
-            place: .headInsertEventTap,
-            options: .defaultTap,
-            eventsOfInterest: eventMask,
-            callback: cgEventHandler,
-            userInfo: nil)
+        // On macOS 15, newly granted Accessibility permission may take a moment to
+        // propagate to the HID event tap subsystem. Retry a few times before giving up.
+        for attempt in 1...4 {
+            eventTap = CGEvent.tapCreate(
+                tap: .cghidEventTap,
+                place: .headInsertEventTap,
+                options: .defaultTap,
+                eventsOfInterest: eventMask,
+                callback: cgEventHandler,
+                userInfo: nil)
+            if eventTap != nil { break }
+            if attempt < 4 {
+                Logger.debug { "Event tap attempt \(attempt) failed; retrying in 1s" }
+                Thread.sleep(forTimeInterval: 1)
+            }
+        }
         if let eventTap {
             let runLoopSource = CFMachPortCreateRunLoopSource(nil, eventTap, 0)
             CFRunLoopAddSource(BackgroundWork.keyboardAndMouseAndTrackpadEventsThread.runLoop, runLoopSource, .commonModes)
         } else {
-            Logger.warning { "Event tap creation failed - continuing without it" }
+            Logger.warning { "Event tap creation failed after 4 attempts - continuing without it" }
         }
     }
 
