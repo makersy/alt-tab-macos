@@ -1,0 +1,74 @@
+name: Build DMG
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+env:
+  APP_NAME: AltTab
+
+jobs:
+  build:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_16.2.app/Contents/Developer
+
+      - name: Get version from git tag
+        id: version
+        run: |
+          VERSION=$(git describe --tags --abbrev=0 2>/dev/null || echo "0.0.0")
+          VERSION=${VERSION#v}
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Create local.xcconfig
+        run: |
+          printf 'CURRENT_PROJECT_VERSION = 1\nAPPCENTER_SECRET =\n' > config/local.xcconfig
+
+      - name: Regenerate l10n strings
+        run: scripts/l10n/extract_l10n_strings.sh
+
+      - name: Build app (unsigned)
+        run: |
+          set -o pipefail
+          xcodebuild \
+            -project alt-tab-macos.xcodeproj \
+            -scheme Release \
+            -derivedDataPath DerivedData \
+            -configuration Release \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            | scripts/xcbeautify
+
+      - name: Create DMG
+        run: |
+          APP_PATH="DerivedData/Build/Products/Release/${APP_NAME}.app"
+          VERSION="${{ steps.version.outputs.version }}"
+          DMG_NAME="${APP_NAME}-${VERSION}-unsigned.dmg"
+          STAGING_DIR=$(mktemp -d)
+          cp -R "$APP_PATH" "$STAGING_DIR/"
+          ln -s /Applications "$STAGING_DIR/Applications"
+          hdiutil create -volname "$APP_NAME" \
+            -srcfolder "$STAGING_DIR" \
+            -ov -format UDZO \
+            "$DMG_NAME"
+          echo "DMG_NAME=$DMG_NAME" >> "$GITHUB_ENV"
+
+      - name: Upload DMG artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.DMG_NAME }}
+          path: ${{ env.DMG_NAME }}
+
+      - name: Create Release (on tag push)
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v3
+        with:
+          files: ${{ env.DMG_NAME }}
+          generate_release_notes: true
