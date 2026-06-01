@@ -68,18 +68,29 @@ class SystemPermissions {
     }
 
     private static func checkPermissionsPreStartup() {
-        // Skip permission checks - always proceed
-        DispatchQueue.main.async {
-            preStartupPermissionsPassed = true
-            PermissionsWindow.shared?.close()
-            setInfrequentTimer()
-            startListeningForDistributedRevoke()
-            App.continueAppLaunchAfterPermissionsAreGranted()
+        let axGranted = AccessibilityPermission.status != .notGranted
+        let srOk = ScreenRecordingPermission.status != .notGranted
+        if axGranted && srOk {
+            DispatchQueue.main.async {
+                preStartupPermissionsPassed = true
+                PermissionsWindow.shared?.close()
+                setInfrequentTimer()
+                startListeningForDistributedRevoke()
+                App.continueAppLaunchAfterPermissionsAreGranted()
+            }
+        } else if !axGranted {
+            // Prompt system dialog on main thread (only works on main thread)
+            DispatchQueue.main.async {
+                _ = AXIsProcessTrustedWithOptions([kAXTrustedCheckOptionPrompt.takeRetainedValue(): true] as CFDictionary)
+            }
         }
     }
 
     private static func checkPermissionsPostStartup() {
-        // Don't restart on permission revocation
+        if AccessibilityPermission.status == .notGranted {
+            Logger.error { "Accessibility permission revoked while AltTab was running; restarting" }
+            DispatchQueue.main.async { App.restart() }
+        }
     }
 
     // Post-startup, with the distributed-notification listener wired up, we only need a sparse
