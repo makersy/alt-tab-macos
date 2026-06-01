@@ -115,7 +115,7 @@ class AccessibilityPermission {
     }
 
     private static func detect() -> PermissionStatus {
-        return .granted
+        return AXIsProcessTrustedWithOptions([kAXTrustedCheckOptionPrompt.takeRetainedValue(): false] as CFDictionary) ? .granted : .notGranted
     }
 }
 
@@ -129,6 +129,10 @@ class ScreenRecordingPermission {
     }
 
     private static func detect() -> PermissionStatus {
+        if #available(macOS 10.15, *) {
+            guard !Preferences.screenRecordingPermissionSkipped else { return .skipped }
+            return isGrantedOnSomeDisplay() ? .granted : .notGranted
+        }
         return .granted
     }
 
