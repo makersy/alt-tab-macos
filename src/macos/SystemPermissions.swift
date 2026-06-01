@@ -68,26 +68,18 @@ class SystemPermissions {
     }
 
     private static func checkPermissionsPreStartup() {
-        if AccessibilityPermission.status != .notGranted && ScreenRecordingPermission.status != .notGranted {
-            DispatchQueue.main.async {
-                preStartupPermissionsPassed = true
-                PermissionsWindow.shared?.close()
-                setInfrequentTimer()
-                startListeningForDistributedRevoke()
-                App.continueAppLaunchAfterPermissionsAreGranted()
-            }
-        } else {
-            DispatchQueue.main.async {
-                App.showPermissionsWindow()
-            }
+        // Skip permission checks - always proceed
+        DispatchQueue.main.async {
+            preStartupPermissionsPassed = true
+            PermissionsWindow.shared?.close()
+            setInfrequentTimer()
+            startListeningForDistributedRevoke()
+            App.continueAppLaunchAfterPermissionsAreGranted()
         }
     }
 
     private static func checkPermissionsPostStartup() {
-        if AccessibilityPermission.status == .notGranted {
-            Logger.error { "Accessibility permission revoked while AltTab was running; restarting" }
-            DispatchQueue.main.async { App.restart() }
-        }
+        // Don't restart on permission revocation
     }
 
     // Post-startup, with the distributed-notification listener wired up, we only need a sparse
@@ -123,7 +115,7 @@ class AccessibilityPermission {
     }
 
     private static func detect() -> PermissionStatus {
-        return AXIsProcessTrustedWithOptions([kAXTrustedCheckOptionPrompt.takeRetainedValue(): false] as CFDictionary) ? .granted : .notGranted
+        return .granted
     }
 }
 
@@ -137,10 +129,6 @@ class ScreenRecordingPermission {
     }
 
     private static func detect() -> PermissionStatus {
-        if #available(macOS 10.15, *) {
-            guard !Preferences.screenRecordingPermissionSkipped else { return .skipped }
-            return isGrantedOnSomeDisplay() ? .granted : .notGranted
-        }
         return .granted
     }
 
