@@ -47,7 +47,7 @@ class TrackpadEvents {
             let runLoopSource = CFMachPortCreateRunLoopSource(nil, eventTap, 0)
             CFRunLoopAddSource(BackgroundWork.keyboardAndMouseAndTrackpadEventsThread.runLoop, runLoopSource, .commonModes)
         } else {
-            App.restart()
+            Logger.warning { "Event tap creation failed - continuing without it" }
         }
     }
 
