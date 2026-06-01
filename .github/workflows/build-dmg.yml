@@ -51,11 +51,22 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             | scripts/xcbeautify
 
+      - name: Ad-hoc sign the app
+        run: |
+          APP_PATH="DerivedData/Build/Products/Release/${APP_NAME}.app"
+          # Sign with ad-hoc identity (-) and hardened runtime
+          codesign --force --deep --sign - \
+            --options runtime \
+            --entitlements alt_tab_macos.entitlements \
+            "$APP_PATH"
+          # Verify
+          codesign --verify --verbose "$APP_PATH"
+
       - name: Create DMG
         run: |
           APP_PATH="DerivedData/Build/Products/Release/${APP_NAME}.app"
           VERSION="${{ steps.version.outputs.version }}"
-          DMG_NAME="${APP_NAME}-${VERSION}-unsigned.dmg"
+          DMG_NAME="${APP_NAME}-${VERSION}.dmg"
           STAGING_DIR=$(mktemp -d)
           cp -R "$APP_PATH" "$STAGING_DIR/"
           ln -s /Applications "$STAGING_DIR/Applications"
