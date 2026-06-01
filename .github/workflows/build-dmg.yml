@@ -27,7 +27,9 @@ jobs:
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Create local.xcconfig
-        run: printf 'CURRENT_PROJECT_VERSION = 1\nAPPCENTER_SECRET=*** > config/local.xcconfig
+        run: |
+          echo "CURRENT_PROJECT_VERSION = 1" > config/local.xcconfig
+          echo "APPCENTER_SECRET=" >> config/local.xcconfig
 
       - name: Regenerate l10n strings
         run: scripts/l10n/extract_l10n_strings.sh
