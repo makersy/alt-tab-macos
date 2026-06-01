@@ -17,7 +17,7 @@ jobs:
           fetch-depth: 0
 
       - name: Select Xcode
-        run: sudo xcode-select -s /Applications/Xcode_16.2.app/Contents/Developer
+        run: sudo xcode-select -s /Applications/Xcode_26.0.1.app/Contents/Developer
 
       - name: Get version from git tag
         id: version
@@ -27,8 +27,7 @@ jobs:
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Create local.xcconfig
-        run: |
-          printf 'CURRENT_PROJECT_VERSION = 1\nAPPCENTER_SECRET =\n' > config/local.xcconfig
+        run: printf 'CURRENT_PROJECT_VERSION = 1\nAPPCENTER_SECRET=*** > config/local.xcconfig
 
       - name: Regenerate l10n strings
         run: scripts/l10n/extract_l10n_strings.sh
