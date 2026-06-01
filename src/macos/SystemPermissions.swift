@@ -85,7 +85,7 @@ class SystemPermissions {
             // has a chance to self-correct via its real-AX-call fallback.
             AccessibilityPermission.consecutiveNotGrantedDetectionCount += 1
             let threshold = 3
-            Logger.warn {
+            Logger.error {
                 "Accessibility not granted (attempt \(AccessibilityPermission.consecutiveNotGrantedDetectionCount)/\(threshold))"
             }
             if AccessibilityPermission.consecutiveNotGrantedDetectionCount >= threshold {
@@ -134,7 +134,7 @@ class AccessibilityPermission {
     /// values. We count consecutive detections where the API claims .notGranted while we
     /// haven't yet prompted the user. Only after this threshold do we actually show the
     /// system dialog — which gives the API time to self-correct.
-    private static var consecutiveNotGrantedDetectionCount = 0
+    fileprivate static var consecutiveNotGrantedDetectionCount = 0
     /// Reset by `checkPermissionsPreStartup` when it shows the system dialog.
     static func markSystemDialogShown() { consecutiveNotGrantedDetectionCount = 0 }
 
