@@ -62,7 +62,7 @@ jobs:
           # Verify
           codesign --verify --verbose "$APP_PATH"
 
-      - name: Create DMG
+      - name: Remove quarantine & Create DMG
         run: |
           APP_PATH="DerivedData/Build/Products/Release/${APP_NAME}.app"
           VERSION="${{ steps.version.outputs.version }}"
@@ -70,6 +70,8 @@ jobs:
           STAGING_DIR=$(mktemp -d)
           cp -R "$APP_PATH" "$STAGING_DIR/"
           ln -s /Applications "$STAGING_DIR/Applications"
+          # Strip quarantine flag so Gatekeeper doesn't block it
+          xattr -cr "$STAGING_DIR/${APP_NAME}.app"
           hdiutil create -volname "$APP_NAME" \
             -srcfolder "$STAGING_DIR" \
             -ov -format UDZO \
