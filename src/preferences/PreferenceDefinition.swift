@@ -31,15 +31,6 @@ struct PreferenceDefinition<T: MacroPreference & CaseIterable & Equatable> {
     /// 3. Otherwise → return stored, which has been downgraded to the free equivalent already.
     func read() -> T {
         let stored: T = CachedUserDefaults.macroPref(key, Array(T.allCases))
-        guard let gate = gate, LicenseManager.shared.isProLocked else { return stored }
-        if ProTransitionManager.shared.isFreePassSessionActive,
-           let rememberedIdx = ProTransitionState.int(gate.rememberedKey),
-           Array(T.allCases).indices.contains(rememberedIdx) {
-            return Array(T.allCases)[rememberedIdx]
-        }
-        if gate.isProValue(stored) {
-            return gate.freeEquivalent
-        }
         return stored
     }
 

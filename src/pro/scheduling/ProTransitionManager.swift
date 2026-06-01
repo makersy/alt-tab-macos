@@ -158,87 +158,34 @@ class ProTransitionManager {
     var userOptedOut: Bool { get { state.userOptedOut } set { state.userOptedOut = newValue } }
     var hasTriggeredPostExpirationSwitcher: Bool { get { state.hasTriggeredPostExpirationSwitcher } set { state.hasTriggeredPostExpirationSwitcher = newValue } }
 
-    var shouldShowBadgeDot: Bool {
-        ProTransitionManagerTestable.shouldShowBadgeDot(currentState())
-    }
+    var shouldShowBadgeDot: Bool { false }
 
     // MARK: - Lifecycle
 
     func onAppLaunchComplete() {
-        scheduler.onAppLaunchComplete()
+        // No-op: Pro is always unlocked
     }
 
     func onLicenseStateChanged() {
-        if case .pro = LicenseManager.shared.state {
-            scheduler.cancel()
-            emit(.dismissAllProWindows)
-            emit(.refreshBadge)
-        }
-        // Snapshot + downgrade any degradable Pro selections as soon as the license locks. Idempotent:
-        // second entry is a no-op because stored is already the Free equivalent.
-        if LicenseManager.shared.isProLocked {
-            onProLockEngaged()
-        }
+        // No-op: always Pro
     }
 
     // MARK: - Hard-gate flow
 
     /// Called from App.hideUi() when the switcher panel is dismissed.
     func onSwitcherDismissed() {
-        // End any active free-pass session — the next switcher open should see the free-tier read.
-        isFreePassSessionActive = false
-        guard let action = pendingDismissAction else { return }
-        pendingDismissAction = nil
-        // delay so the focused window has time to come to front before our window appears above it
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
-            switch action {
-            case .showFullUpgrade(let feature):
-                self.showFullUpgradeWindow(for: feature)
-            case .showDay4Tour:
-                self.emit(.showDay4Tour)
-            }
-        }
+        // No-op: always Pro
     }
 
     /// Called from App.showUiOrCycleSelection() at the start of a fresh switcher session (not on cycle).
     /// Decides whether to queue a Day 4 tour or a post-expiration free-pass + [C] for after dismissal.
     func onSwitcherShown() {
-        let action = ProTransitionManagerTestable.evaluateSwitcherOpen(currentState())
-        switch action {
-        case .showDay4Tour:
-            state.hasSeenDay4Tour = true
-            pendingDismissAction = .showDay4Tour
-        case .triggerFreePass:
-            state.freePassUsed = true
-            state.hasTriggeredPostExpirationSwitcher = true
-            isFreePassSessionActive = true
-            let style = state.rememberedAppearanceStyle.flatMap { AppearanceStylePreference.allCases[safe: $0] }
-            let reason = HardGateReason.proPreferences(
-                appearanceStyle: style,
-                shortcut: state.rememberedShortcutStyle != nil)
-            pendingDismissAction = .showFullUpgrade(reason)
-        case .noop:
-            break
-        }
+        // No-op: always Pro
     }
 
     /// Returns true if the feature should be allowed to execute
     func attemptHardGatedFeature(_ feature: ProFeature) -> Bool {
-        let action = ProTransitionManagerTestable.evaluateHardGate(currentState())
-        switch action {
-        case .allow: return true
-        case .freePass:
-            state.freePassUsed = true
-            isFreePassSessionActive = true
-            pendingDismissAction = .showFullUpgrade(.feature(feature))
-            return true
-        case .showFullUpgrade:
-            showFullUpgradeWindow(for: .feature(feature))
-            return false
-        case .showHardGatePopover:
-            emit(.showDay15HardGatePopover(.feature(feature)))
-            return false
-        }
+        return true
     }
 
     func showFullUpgradeWindow(for reason: HardGateReason? = nil) {
@@ -269,27 +216,7 @@ class ProTransitionManager {
     // MARK: - Timed fire dispatch
 
     private func evaluateAndShow() {
-        let action = ProTransitionManagerTestable.evaluateTimedAction(currentState())
-        switch action {
-        case .showWelcome:
-            state.hasSeenWelcome = true
-            emit(.showWelcome)
-        case .showDay12HeadsUp:
-            state.hasSeenDay12 = true
-            emit(.showDay12HeadsUp)
-        case .showDay15Proactive:
-            showProactiveDay15Window()
-        case .showDay21Reminder:
-            state.hasSeenDay21 = true
-            emit(.showDay21Reminder)
-        case .showDay35Final:
-            state.hasSeenDay35 = true
-            emit(.showDay35Final)
-        case .refreshBadgeDot:
-            emit(.refreshBadge)
-        case .none:
-            break
-        }
+        // No-op: always Pro
     }
 
     // MARK: - State snapshot

@@ -59,7 +59,7 @@ class PreferencesEvents {
             }
             return
         }
-        if LicenseManager.shared.isProLocked && ProFeature.isStoredValuePro(preferenceKey: key) {
+        if false && LicenseManager.shared.isProLocked && ProFeature.isStoredValuePro(preferenceKey: key) {
             UpgradeTab.navigateToUpgradeTab()
         }
         ControlsTab.preferenceChanged(key)
