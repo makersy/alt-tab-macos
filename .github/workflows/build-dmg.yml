@@ -51,29 +51,10 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             | scripts/xcbeautify
 
-      - name: Import signing certificate
-        env:
-          CERT_B64: ${{ secrets.SIGNING_CERTIFICATE_P12 }}
-          CERT_PASS: ${{ secrets.SIGNING_CERTIFICATE_PASSWORD }}
-        run: |
-          echo "$CERT_B64" | base64 --decode > codesign.p12
-          KEYCHAIN="alt-tab-macos.keychain"
-          KEYCHAIN_PASS="temp-keychain-pass"
-          security create-keychain -p "$KEYCHAIN_PASS" "$KEYCHAIN"
-          security default-keychain -s "$KEYCHAIN"
-          security unlock-keychain -p "$KEYCHAIN_PASS" "$KEYCHAIN"
-          security import codesign.p12 -P "$CERT_PASS" -T /usr/bin/codesign
-          security set-key-partition-list -S apple-tool:,apple: -s -k "$KEYCHAIN_PASS" "$KEYCHAIN" > /dev/null
-          # List identities for debugging and extract the signing identity
-          security find-identity -v -p codesigning "$KEYCHAIN"
-          IDENTITY=$(security find-identity -v -p codesigning "$KEYCHAIN" | awk -F'"' '/Local Self-Signed/ {print $2}' | head -1)
-          echo "SIGNING_IDENTITY=$IDENTITY" >> "$GITHUB_ENV"
-          echo "Using signing identity: $IDENTITY"
-
-      - name: Sign the app
+      - name: Ad-hoc sign the app
         run: |
           APP_PATH="DerivedData/Build/Products/Release/${APP_NAME}.app"
-          codesign --force --deep --sign "$SIGNING_IDENTITY" \
+          codesign --force --deep --sign - \
             --options runtime \
             --entitlements alt_tab_macos.entitlements \
             "$APP_PATH"
