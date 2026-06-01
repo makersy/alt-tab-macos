@@ -64,7 +64,11 @@ jobs:
           security unlock-keychain -p "$KEYCHAIN_PASS" "$KEYCHAIN"
           security import codesign.p12 -P "$CERT_PASS" -T /usr/bin/codesign
           security set-key-partition-list -S apple-tool:,apple: -s -k "$KEYCHAIN_PASS" "$KEYCHAIN" > /dev/null
-          echo "SIGNING_IDENTITY=$(security find-identity -v -p codesigning "$KEYCHAIN" | grep -o '"Local Self-Signed"' | head -1 | tr -d '"')" >> "$GITHUB_ENV"
+          # List identities for debugging and extract the signing identity
+          security find-identity -v -p codesigning "$KEYCHAIN"
+          IDENTITY=$(security find-identity -v -p codesigning "$KEYCHAIN" | awk -F'"' '/Local Self-Signed/ {print $2}' | head -1)
+          echo "SIGNING_IDENTITY=$IDENTITY" >> "$GITHUB_ENV"
+          echo "Using signing identity: $IDENTITY"
 
       - name: Sign the app
         run: |
